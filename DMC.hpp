@@ -7,8 +7,33 @@
 #include <sstream>
 #include "assert.h"
 #include "aig.hpp"
+#include "sat_solver.hpp"
 using namespace std;
 
+
+unsigned long long state_count = 0;
+
+class State{
+public:
+    vector<int> latches, inputs;
+    State * next = nullptr;
+    unsigned long long index;
+    int failed;
+    int failed_depth;
+    State(){
+        state_count++;
+        index =  state_count;
+        failed = 0;
+        failed_depth = 0;
+    }
+    State(vector<int> l, vector<int> i):latches(l),inputs(i){
+        state_count++;
+        index =  state_count;
+        failed = 0;
+        failed_depth = 0;
+    }
+    void clear(){latches.clear(); inputs.clear(); next = nullptr;}
+};
 
 class Variable{ 
 public:
@@ -47,7 +72,8 @@ class DMC {
     vector<And> ands;
     vector<int> nexts;
     vector<int> constraints, constraints_prime;
-    vector<int> init_state; set<int> set_init_state;
+    vector<int> state_I; 
+    set<int> set_state_I;
     int bad, bad_prime;
     const int unprimed_first_dimacs = 2;
     int primed_first_dimacs;
@@ -55,12 +81,32 @@ class DMC {
     bool use_acc, use_pc;
     map<int, int> map_to_prime, map_to_unprime;
 
+    minisatSimp *satelite = nullptr;
 public:
+
+    bool find_cex = false;
+    vector<State *> states, cex_states;
+
+    SATSolver *state_B_solver = nullptr;
+    SATSolver *state_I_solver = nullptr;
+
+    int nQuery;
+
     bool check();
     void aig2Dimacs();
     void initialize();
 
+    void encode_state_I(SATSolver *s);   // I
+    void encode_state_B(SATSolver *s);        // Bad cone, used for test SAT?[I/\-B]
+    void encode_transition(SATSolver *s);
+
+    void extract_state_from_sat(SATSolver *sat, State *s, State *succ);
+
     bool check_one_step();
+
+    bool get_pre_B(State *s);
+    bool get_suc_I(State *s);
+
     void expand_I();
     void expand_B();
 
